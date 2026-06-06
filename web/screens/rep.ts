@@ -98,18 +98,36 @@ function buildWidget(
     }
 
     case "numeric_tol": {
-      return h("input", {
+      const onNum = (el: HTMLInputElement) => {
+        const raw = el.value;
+        const n = Number(raw);
+        commit({ kind: "numeric_tol", value: n }, raw.trim() !== "" && !Number.isNaN(n));
+      };
+      const input = h("input", {
         type: "number",
         class: "text-input",
         step: "any",
         placeholder: "Enter a number",
         "aria-label": "Your numeric answer",
-        onInput: (e: Event) => {
-          const raw = (e.target as HTMLInputElement).value;
-          const n = Number(raw);
-          commit({ kind: "numeric_tol", value: n }, raw.trim() !== "" && !Number.isNaN(n));
-        },
-      });
+        onInput: (e: Event) => onNum(e.target as HTMLInputElement),
+      }) as HTMLInputElement;
+      const bump = (delta: number) => {
+        const cur = Number(input.value);
+        input.value = String((Number.isFinite(cur) ? cur : 0) + delta);
+        onNum(input);
+        input.focus();
+      };
+      return h(
+        "div",
+        { class: "number-field" },
+        input,
+        h(
+          "div",
+          { class: "stepper" },
+          h("button", { type: "button", class: "step-btn", tabindex: "-1", "aria-label": "Increment", onClick: () => bump(1) }, "▲"),
+          h("button", { type: "button", class: "step-btn", tabindex: "-1", "aria-label": "Decrement", onClick: () => bump(-1) }, "▼"),
+        ),
+      );
     }
 
     case "rubric_program": {

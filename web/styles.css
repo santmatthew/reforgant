@@ -327,11 +327,36 @@ strong { font-weight: 600; color: var(--ink); }
 }
 .text-input::placeholder { color: var(--faint); }
 .text-input:focus { outline: none; border-color: var(--ember); box-shadow: 0 0 0 3px var(--accent-bg); }
-/* Remove the native number spinners — their up/down arrows are drawn by the OS/
-   GTK theme (dark, unthemable). These reps just want a typed number. */
+/* Hide the native number spinners (OS/GTK-drawn, dark, unthemable); we draw our
+   own themed steppers in .stepper below. */
 .text-input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
 .text-input[type="number"]::-webkit-outer-spin-button,
 .text-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* number field = input + custom up/down steppers */
+.number-field { display: inline-flex; align-items: stretch; width: 100%; max-width: 300px; }
+.number-field .text-input {
+  max-width: none; flex: 1; min-width: 0;
+  border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0;
+}
+.number-field .text-input:focus { box-shadow: none; border-color: var(--line-strong); }
+.number-field:focus-within { border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--accent-bg); }
+.number-field:focus-within .text-input,
+.number-field:focus-within .stepper { border-color: var(--ember); }
+.stepper {
+  display: flex; flex-direction: column; flex: none;
+  border: 1px solid var(--line-strong); border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0; overflow: hidden;
+}
+.step-btn {
+  flex: 1; width: 36px; padding: 0; border: none; cursor: pointer;
+  display: grid; place-content: center; font-size: 8px; line-height: 1;
+  background: var(--surface-3); color: var(--muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.step-btn:hover { background: var(--ember); color: var(--on-accent); }
+.step-btn:active { background: var(--ember-deep); }
+.step-btn + .step-btn { border-top: 1px solid var(--line-strong); }
 
 /* ── computing ── */
 .computing { display: flex; justify-content: center; padding: 28px 0 10px; }
