@@ -4,28 +4,39 @@ import { h } from "./dom.ts";
 import { CONFIDENCE_TEXT } from "./labels.ts";
 import { CONFIDENCE_LABELS, type ConfidenceLabel } from "../diagnostic.ts";
 
-/** 5-point ordinal confidence selector (v2.1). Calls onPick with the label. */
+/**
+ * 5-point ordinal confidence selector (v2.1). Updates its own highlight in place
+ * (no app-wide re-render), then calls onPick — so selecting feels instant.
+ */
 export function ordinalScale(
   selected: ConfidenceLabel | null,
   onPick: (label: ConfidenceLabel) => void,
 ): HTMLElement {
-  return h(
-    "div",
-    { class: "ordinal", role: "radiogroup", "aria-label": "Confidence" },
-    ...CONFIDENCE_LABELS.map((label) =>
-      h(
-        "button",
-        {
-          type: "button",
-          role: "radio",
-          "aria-checked": String(selected === label),
-          class: `ordinal-opt${selected === label ? " ordinal-selected" : ""}`,
-          onClick: () => onPick(label),
+  const buttons: HTMLElement[] = [];
+  const root = h("div", { class: "ordinal", role: "radiogroup", "aria-label": "Confidence" });
+  for (const label of CONFIDENCE_LABELS) {
+    const b = h(
+      "button",
+      {
+        type: "button",
+        role: "radio",
+        "aria-checked": String(selected === label),
+        class: `ordinal-opt${selected === label ? " ordinal-selected" : ""}`,
+        onClick: () => {
+          buttons.forEach((btn, idx) => {
+            const on = CONFIDENCE_LABELS[idx] === label;
+            btn.classList.toggle("ordinal-selected", on);
+            btn.setAttribute("aria-checked", String(on));
+          });
+          onPick(label);
         },
-        CONFIDENCE_TEXT[label],
-      ),
-    ),
-  );
+      },
+      CONFIDENCE_TEXT[label],
+    );
+    buttons.push(b);
+    root.append(b);
+  }
+  return root;
 }
 
 export function card(...children: (Node | string | null | undefined | false)[]): HTMLElement {
