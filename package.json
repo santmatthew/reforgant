@@ -1,0 +1,24 @@
+{
+  "name": "unprompted-diagnostic",
+  "version": "2.0.0",
+  "description": "Unprompted — Atrophy & Recovery System v2, Subsystem 1: the Diagnostic. Pure, deterministic intake + baseline → seeded model state.",
+  "type": "module",
+  "module": "diagnostic.ts",
+  "exports": {
+    ".": "./diagnostic.ts"
+  },
+  "scripts": {
+    "start": "bun run server.ts",
+    "dev": "bun --hot run server.ts",
+    "build": "bun build ./web/index.html --outdir dist --minify",
+    "build:single": "bun run build-static.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.9.0",
+    "@types/bun": "latest",
+    "katex": "^0.17.0",
+    "typescript": "^5"
+  }
+}

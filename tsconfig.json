@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ES2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "types": ["bun"],
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+    // Note: noUncheckedIndexedAccess is intentionally off — the program pulls in
+    // the untouched reference spec/research/atrophy-model.ts (via the parity
+    // test's import), which is not written for that flag. `strict` stays on.
+  },
+  "include": [
+    "diagnostic.ts",
+    "diagnostic.test.ts",
+    "server.ts",
+    "bun-env.d.ts",
+    "web/**/*.ts",
+    "spec/research/atrophy-model.ts"
+  ]
+}
