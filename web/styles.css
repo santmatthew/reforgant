@@ -327,6 +327,11 @@ strong { font-weight: 600; color: var(--ink); }
 }
 .text-input::placeholder { color: var(--faint); }
 .text-input:focus { outline: none; border-color: var(--ember); box-shadow: 0 0 0 3px var(--accent-bg); }
+/* Remove the native number spinners — their up/down arrows are drawn by the OS/
+   GTK theme (dark, unthemable). These reps just want a typed number. */
+.text-input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.text-input[type="number"]::-webkit-outer-spin-button,
+.text-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* ── computing ── */
 .computing { display: flex; justify-content: center; padding: 28px 0 10px; }
