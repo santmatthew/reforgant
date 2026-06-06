@@ -12,6 +12,7 @@
     "dev": "bun --hot run server.ts",
     "build": "bun build ./web/index.html --outdir dist --minify",
     "build:single": "bun run build-static.ts",
+    "build:pages": "rm -rf docs && bun build ./web/index.html --outdir docs --minify && touch docs/.nojekyll",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
