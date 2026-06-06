@@ -11,6 +11,9 @@ const KEYWORDS: Record<string, Set<string>> = {
   javascript: new Set(
     "const let var function return for of in if else while do class new import from export default try catch finally throw typeof instanceof void delete await async yield null undefined true false this super break continue switch case console".split(" "),
   ),
+  typescript: new Set(
+    "const let var function return for of in if else while do class new import from export default try catch finally throw typeof instanceof void delete await async yield null undefined true false this super break continue switch case console interface type enum implements readonly public private protected number string boolean any unknown never void".split(" "),
+  ),
 };
 
 function esc(s: string): string {

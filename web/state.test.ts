@@ -18,7 +18,7 @@ import {
   isComplete,
   type SessionState,
 } from "./state.ts";
-import { DEMO_BATTERY, BATTERY_ID, interleaveByCluster, type RubricUiPayload } from "./battery.ts";
+import { DEMO_BATTERY, BATTERY_ID, buildBattery, interleaveByCluster, type RubricUiPayload } from "./battery.ts";
 
 const NOW = "2026-06-03T12:00:00.000Z";
 const ALL_ONE: IntakeResponses = { timeline: 1, delegation: 1, recency: 1, reserve: 1, confidence: 1 };
@@ -150,13 +150,40 @@ describe("resume", () => {
     expect(JSON.parse(JSON.stringify(mid))).toEqual(mid);
   });
 
-  it("retake clears captures + class priors but reuses rep ids", () => {
-    const done = driveToComputing();
+  it("retake clears captures + class priors, keeps the language", () => {
+    let done = driveToComputing();
+    done = { ...done, language: "go" };
     const again = reduce(done, { type: "retake", runId: "run2", startedAt: NOW }, NOW);
     expect(again.screen.kind).toBe("intake");
     expect(Object.keys(again.classPriors)).toHaveLength(0);
-    expect(again.captures.map((c) => c.repId)).toEqual(done.captures.map((c) => c.repId));
+    expect(again.language).toBe("go"); // language carried across retake
+    expect(again.captures).toHaveLength(done.captures.length);
     expect(again.captures.every((c) => c.submission === null && c.elapsedSeconds === null)).toBe(true);
+  });
+});
+
+// ── language ─────────────────────────────────────────────────────────────────
+
+describe("language", () => {
+  it("buildBattery is language-specific; agnostic falls back to recall reps", () => {
+    const go = buildBattery("go");
+    expect(go).toHaveLength(15);
+    expect(go[0].id).toBe("idiom_squares_go");
+    expect(go[0].prompt).toContain("Go");
+    expect(buildBattery("agnostic")[0].id).toBe("ag_recall_1");
+    // every language battery keeps the §6.1 cluster composition
+    for (const lang of ["python", "rust", "swift", "basic"] as const) {
+      expect(new Set(buildBattery(lang).map((r) => r.cluster)).size).toBe(9);
+    }
+  });
+
+  it("setLanguage applies on Welcome and is locked afterward", () => {
+    let s = initialState("r", NOW, DEMO_BATTERY, BATTERY_ID);
+    s = reduce(s, { type: "setLanguage", language: "rust" }, NOW);
+    expect(s.language).toBe("rust");
+    s = reduce(s, { type: "startIntake" }, NOW);
+    s = reduce(s, { type: "setLanguage", language: "go" }, NOW);
+    expect(s.language).toBe("rust"); // ignored after leaving Welcome
   });
 });
 
@@ -176,11 +203,11 @@ describe("scripted-run fixture", () => {
       runId: "fix",
       startedAt: NOW,
       screen: { kind: "computing" },
+      language: "agnostic",
       intake: ALL_ONE,
       classPriors: { T1: "certain", T2: "fairlySure", T3: "certain" },
       batteryId: "fix",
-      captures: ILLUSTRATIVE_REPS.map((rep, i) => ({
-        repId: rep.id,
+      captures: ILLUSTRATIVE_REPS.map((_, i) => ({
         repStartedAt: NOW,
         submission: ILLUSTRATIVE_SUBMISSIONS[i],
         elapsedSeconds: elapsed[i],

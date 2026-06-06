@@ -616,3 +616,18 @@ h1[tabindex]:focus { outline: none; }
 :root[data-theme="clean"] .calib-cell .cluster-name,
 :root[data-theme="clean"] .tier-card-head strong { font-family: var(--font-body); font-weight: 650; }
 :root[data-theme="clean"] .wordmark { font-weight: 700; }
+
+/* ── language picker (Welcome) ── */
+.lang-field { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 2px 0 4px; }
+.lang-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+.lang-select {
+  font: inherit; font-size: 15px; font-family: var(--font-body); color: var(--ink);
+  appearance: none; -webkit-appearance: none;
+  background-color: var(--surface-3); border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  padding: 10px 40px 10px 14px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8a8a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 13px center; background-size: 12px;
+  transition: border-color 0.12s ease;
+}
+.lang-select:hover { border-color: var(--ember); }
+.lang-select:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }

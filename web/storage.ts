@@ -7,10 +7,9 @@ import type { SessionState } from "./state.ts";
 import type { DiagnosticResult } from "../diagnostic.ts";
 
 const STORAGE_KEY = "unprompted.diagnostic.v2";
-// 2: per-item confidence removed; SessionState.screen no longer has a "confidence"
-//    kind and RepCapture lost its confidence fields. Bumping discards v1 sessions
-//    so a stale in-progress run can't resume into a screen the app no longer renders.
-const SCHEMA_VERSION = 2 as const;
+// 3: SessionState gained `language`; captures became positional (no repId).
+//    Bump discards older sessions so a stale shape can't resume incorrectly.
+const SCHEMA_VERSION = 3 as const;
 
 export interface PersistedState {
   schemaVersion: typeof SCHEMA_VERSION;

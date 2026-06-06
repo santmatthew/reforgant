@@ -12,8 +12,8 @@ import { describe, it, expect } from "bun:test";
 
 import { computeDiagnostic, TIERS } from "../diagnostic.ts";
 import type { IntakeResponses, Submission, BaselineRep } from "../diagnostic.ts";
-import { initialState, reduce, toRepResults, toClassPriors, classPriorsComplete, type SessionState } from "./state.ts";
-import { DEMO_BATTERY, BATTERY_ID, REP_CODE } from "./battery.ts";
+import { initialState, reduce, toRepResults, toClassPriors, type SessionState } from "./state.ts";
+import { BATTERY_ID, REP_CODE, buildBattery, interleaveByCluster } from "./battery.ts";
 import type { ScreenCtx, ScreenView } from "./screen.ts";
 
 import { welcome } from "./screens/welcome.ts";
@@ -35,9 +35,11 @@ const SCREENS: Record<SessionState["screen"]["kind"], ScreenView> = {
 const NOW = "2026-06-03T12:00:00.000Z";
 const ALL_ONE: IntakeResponses = { timeline: 1, delegation: 1, recency: 1, reserve: 1, confidence: 1 };
 const FIELDS = ["timeline", "delegation", "recency", "reserve", "confidence"] as const;
+// Use a real language battery so the playthrough exercises a highlighted code rep.
+const BATTERY = interleaveByCluster(buildBattery("python"));
 
 function ctx(state: SessionState): ScreenCtx {
-  return { state, battery: DEMO_BATTERY, emit: () => {}, elapsedSeconds: () => 0, history: [], pendingResume: null, restart: () => {} };
+  return { state, battery: BATTERY, emit: () => {}, elapsedSeconds: () => 0, history: [], pendingResume: null, restart: () => {} };
 }
 function renderOf(state: SessionState): HTMLElement {
   return SCREENS[state.screen.kind](ctx(state));
@@ -54,10 +56,12 @@ function demoSubmissionFor(r: BaselineRep): Submission {
 
 describe("DOM render-through (v2.1)", () => {
   it("renders every screen across a full playthrough without throwing", () => {
-    let s = initialState("run", NOW, DEMO_BATTERY, BATTERY_ID);
+    let s = initialState("run", NOW, BATTERY, BATTERY_ID);
 
-    // Welcome
-    expect(renderOf(s).textContent).toContain("How sharp");
+    // Welcome (with language picker)
+    const w = renderOf(s);
+    expect(w.textContent).toContain("How sharp");
+    expect(w.querySelector(".lang-select")).not.toBeNull();
 
     // Intake
     s = reduce(s, { type: "startIntake" }, NOW);
@@ -75,7 +79,7 @@ describe("DOM render-through (v2.1)", () => {
 
     // Baseline loop — rep shown directly, no per-item confidence screen
     const seenFormats = new Set<string>();
-    DEMO_BATTERY.forEach((repDef, i) => {
+    BATTERY.forEach((repDef, i) => {
       expect(s.screen.kind).toBe("rep");
       const repEl = renderOf(s);
       expect(repEl.querySelector(".rep-prompt")?.textContent).toContain(repDef.prompt.slice(0, 12));
@@ -90,14 +94,14 @@ describe("DOM render-through (v2.1)", () => {
       s = reduce(s, { type: "setSubmission", i, submission: demoSubmissionFor(repDef) }, NOW);
       s = reduce(s, { type: "submitRep", i, elapsedSeconds: 10 }, NOW);
     });
-    expect([...seenFormats].sort()).toEqual(["exact", "mcq", "numeric_tol", "rubric_program"]);
+    expect([...seenFormats].sort()).toEqual(["mcq", "numeric_tol", "rubric_program"]);
 
     // Computing
     expect(s.screen.kind).toBe("computing");
     expect(renderOf(s).querySelector(".spinner")).not.toBeNull();
 
     // Results
-    const result = computeDiagnostic(ALL_ONE, DEMO_BATTERY, toRepResults(s, DEMO_BATTERY), toClassPriors(s), NOW);
+    const result = computeDiagnostic(ALL_ONE, BATTERY, toRepResults(s, BATTERY), toClassPriors(s), NOW);
     s = reduce(s, { type: "setResult", result }, NOW);
     const resEl = renderOf(s);
     const text = resEl.textContent ?? "";

@@ -1,9 +1,10 @@
 /**
- * Pure session state machine (v2.1). No DOM, no storage, no clock.
+ * Pure session state machine (v2.2). No DOM, no storage, no clock.
  *
- * Flow: Welcome → Intake → ClassPriors (walked-in beliefs, before any items) →
- * interleaved Rep loop (feedback withheld) → Computing → Results.
- * Per-item confidence is removed; calibration comes from the tier-level priors.
+ * Flow: Welcome (pick language) → Intake → ClassPriors → interleaved Rep loop →
+ * Computing → Results. Captures are positional: capture[i] pairs with battery[i]
+ * by index, so the language-specific battery can be chosen at Welcome without
+ * re-seeding. Scoring lives only in `toRepResults` via `gradeSubmission`.
  */
 
 import {
@@ -19,17 +20,17 @@ import {
   type DiagnosticResult,
   type Tier,
 } from "../diagnostic.ts";
+import { DEFAULT_LANGUAGE, type Language } from "./battery.ts";
 
 export type Screen =
   | { kind: "welcome" }
   | { kind: "intake" }
-  | { kind: "classpriors" } // walked-in beliefs, captured before any items
-  | { kind: "rep"; i: number } // rep i revealed, timer running
+  | { kind: "classpriors" }
+  | { kind: "rep"; i: number }
   | { kind: "computing" }
   | { kind: "results" };
 
 export interface RepCapture {
-  repId: string;
   repStartedAt: string | null; // ISO when Rep(i) mounted (for elapsed timing)
   submission: Submission | null;
   elapsedSeconds: number | null;
@@ -40,14 +41,16 @@ export interface SessionState {
   runId: string;
   startedAt: string;
   screen: Screen;
+  language: Language;
   intake: Partial<IntakeResponses> | null;
-  classPriors: Partial<Record<Tier, ConfidenceLabel>>; // walked-in beliefs (one per tier)
+  classPriors: Partial<Record<Tier, ConfidenceLabel>>;
   batteryId: string;
-  captures: RepCapture[];
+  captures: RepCapture[]; // positional — captures[i] ↔ battery[i]
   result: DiagnosticResult | null;
 }
 
 export type UiEvent =
+  | { type: "setLanguage"; language: Language }
   | { type: "startIntake" }
   | { type: "answerIntake"; field: keyof IntakeResponses; value: IntakeAnswer }
   | { type: "submitIntake" }
@@ -59,18 +62,10 @@ export type UiEvent =
   | { type: "resume"; persisted: SessionState }
   | { type: "retake"; runId: string; startedAt: string };
 
-const INTAKE_FIELDS: (keyof IntakeResponses)[] = [
-  "timeline",
-  "delegation",
-  "recency",
-  "reserve",
-  "confidence",
-];
+const INTAKE_FIELDS: (keyof IntakeResponses)[] = ["timeline", "delegation", "recency", "reserve", "confidence"];
 
-// ── construction ────────────────────────────────────────────────────────────
-
-function freshCapture(repId: string): RepCapture {
-  return { repId, repStartedAt: null, submission: null, elapsedSeconds: null, assisted: false };
+function freshCapture(): RepCapture {
+  return { repStartedAt: null, submission: null, elapsedSeconds: null, assisted: false };
 }
 
 export function initialState(
@@ -83,25 +78,26 @@ export function initialState(
     runId,
     startedAt,
     screen: { kind: "welcome" },
+    language: DEFAULT_LANGUAGE,
     intake: null,
     classPriors: {},
     batteryId,
-    captures: battery.map((rep) => freshCapture(rep.id)),
+    captures: battery.map(() => freshCapture()),
     result: null,
   };
 }
 
-// ── reducer ─────────────────────────────────────────────────────────────────
-
 function patchCapture(state: SessionState, i: number, patch: Partial<RepCapture>): SessionState {
-  return {
-    ...state,
-    captures: state.captures.map((c, idx) => (idx === i ? { ...c, ...patch } : c)),
-  };
+  return { ...state, captures: state.captures.map((c, idx) => (idx === i ? { ...c, ...patch } : c)) };
 }
 
 export function reduce(state: SessionState, event: UiEvent, now: string): SessionState {
   switch (event.type) {
+    case "setLanguage": {
+      if (state.screen.kind !== "welcome") return state; // locked once the run starts
+      return { ...state, language: event.language };
+    }
+
     case "startIntake": {
       if (state.screen.kind !== "welcome") return state;
       return { ...state, screen: { kind: "intake" }, intake: state.intake ?? {} };
@@ -124,7 +120,6 @@ export function reduce(state: SessionState, event: UiEvent, now: string): Sessio
 
     case "submitClassPriors": {
       if (state.screen.kind !== "classpriors" || !classPriorsComplete(state)) return state;
-      // Stamp rep 0's start time as we enter the rep loop.
       const stamped = patchCapture(state, 0, { repStartedAt: now });
       return { ...stamped, screen: { kind: "rep", i: 0 } };
     }
@@ -141,7 +136,6 @@ export function reduce(state: SessionState, event: UiEvent, now: string): Sessio
       const advanced = patchCapture(state, event.i, { elapsedSeconds: event.elapsedSeconds });
       const last = state.captures.length - 1;
       if (event.i < last) {
-        // Stamp the next rep's start time as we advance to it.
         const next = patchCapture(advanced, event.i + 1, { repStartedAt: now });
         return { ...next, screen: { kind: "rep", i: event.i + 1 } };
       }
@@ -158,21 +152,22 @@ export function reduce(state: SessionState, event: UiEvent, now: string): Sessio
     }
 
     case "retake": {
+      // keep the chosen language; clear answers
       return {
         runId: event.runId,
         startedAt: event.startedAt,
         screen: { kind: "intake" },
+        language: state.language,
         intake: {},
         classPriors: {} as Partial<Record<Tier, ConfidenceLabel>>,
         batteryId: state.batteryId,
-        captures: state.captures.map((c) => freshCapture(c.repId)),
+        captures: state.captures.map(() => freshCapture()),
         result: null,
       };
     }
   }
 }
 
-/** Re-stamp the active rep's start time on resume (§12.4 — restart timer). Pure. */
 export function restampActiveRep(state: SessionState, now: string): SessionState {
   if (state.screen.kind !== "rep") return state;
   return patchCapture(state, state.screen.i, { repStartedAt: now });
@@ -180,9 +175,7 @@ export function restampActiveRep(state: SessionState, now: string): SessionState
 
 // ── selectors (pure) ─────────────────────────────────────────────────────────
 
-export function intakeComplete(
-  intake: Partial<IntakeResponses> | null,
-): intake is IntakeResponses {
+export function intakeComplete(intake: Partial<IntakeResponses> | null): intake is IntakeResponses {
   if (!intake) return false;
   return INTAKE_FIELDS.every((f) => {
     const v = intake[f];
@@ -195,9 +188,7 @@ export function classPriorsComplete(state: SessionState): boolean {
 }
 
 export function toClassPriors(state: SessionState): ClassPrior[] {
-  return TIERS
-    .filter((t) => state.classPriors[t] != null)
-    .map((t) => ({ tier: t, confidence: state.classPriors[t] as ConfidenceLabel }));
+  return TIERS.filter((t) => state.classPriors[t] != null).map((t) => ({ tier: t, confidence: state.classPriors[t] as ConfidenceLabel }));
 }
 
 export function activeIndex(state: SessionState): number | null {
@@ -215,32 +206,23 @@ export function currentCapture(state: SessionState): RepCapture | null {
 }
 
 export function isComplete(state: SessionState): boolean {
-  return (
-    state.captures.length > 0 &&
-    state.captures.every((c) => c.submission !== null && c.elapsedSeconds !== null)
-  );
+  return state.captures.length > 0 && state.captures.every((c) => c.submission !== null && c.elapsedSeconds !== null);
 }
 
-/**
- * Build the compute input. Confidence is always null (removed from per-item flow);
- * `ratedAfterFeedback` is always false (baseline withholds feedback). The ongoing
- * hook uses these fields when they differ.
- */
+/** Build the compute input (§10). Captures pair with the battery by INDEX. */
 export function toRepResults(state: SessionState, battery: BaselineRep[]): BaselineRepResult[] {
-  const byId = new Map(battery.map((r) => [r.id, r]));
   const out: BaselineRepResult[] = [];
-  for (const cap of state.captures) {
-    if (cap.submission === null || cap.elapsedSeconds === null) continue;
-    const rep = byId.get(cap.repId);
-    if (!rep) continue;
+  state.captures.forEach((cap, i) => {
+    const rep = battery[i];
+    if (!rep || cap.submission === null || cap.elapsedSeconds === null) return;
     out.push(
       gradeSubmission(rep, cap.submission, {
-        confidence: null, // tier-level priors handle calibration; no per-item confidence
+        confidence: null,
         elapsedSeconds: cap.elapsedSeconds,
         assisted: cap.assisted,
         ratedAfterFeedback: false,
       }),
     );
-  }
+  });
   return out;
 }

@@ -16,7 +16,7 @@ import {
   type SessionState,
   type UiEvent,
 } from "./state.ts";
-import { DEMO_BATTERY, BATTERY_ID, interleaveByCluster } from "./battery.ts";
+import { buildBattery, DEFAULT_LANGUAGE, BATTERY_ID, interleaveByCluster } from "./battery.ts";
 import { elapsedSeconds } from "./timer.ts";
 import * as storage from "./storage.ts";
 import { THEMES, applyTheme, loadTheme, currentTheme } from "./theme.ts";
@@ -40,9 +40,12 @@ const SCREENS: Record<SessionState["screen"]["kind"], ScreenView> = {
   results,
 };
 
-// Items are interleaved across clusters (v2.1) to stop within-session learning
-// from contaminating later same-cluster confidence. Deterministic.
-const BATTERY = interleaveByCluster(DEMO_BATTERY);
+// The battery is built from the chosen language and interleaved across clusters
+// (v2.1) to stop within-session learning contaminating later reps. Deterministic
+// per language, so capture[i] ↔ battery[i] stays consistent across the session.
+function activeBattery() {
+  return interleaveByCluster(buildBattery(state.language));
+}
 
 applyTheme(loadTheme()); // restore the saved theme before first paint
 
@@ -63,7 +66,7 @@ const pendingResume: SessionState | null =
   persisted.current.batteryId === BATTERY_ID
     ? persisted.current
     : null;
-let state: SessionState = initialState(genId(), nowIso(), BATTERY, BATTERY_ID);
+let state: SessionState = initialState(genId(), nowIso(), buildBattery(DEFAULT_LANGUAGE), BATTERY_ID);
 
 // ── dispatch + effects ───────────────────────────────────────────────────────
 
@@ -97,10 +100,11 @@ function doCompute(): void {
   computeScheduled = false;
   if (state.screen.kind !== "computing") return;
   try {
+    const b = activeBattery();
     const result = computeDiagnostic(
       state.intake as IntakeResponses,
-      BATTERY,
-      toRepResults(state, BATTERY),
+      b,
+      toRepResults(state, b),
       toClassPriors(state),
       nowIso(),
     );
@@ -119,7 +123,7 @@ function restart(): void {
 function makeCtx(): ScreenCtx {
   return {
     state,
-    battery: BATTERY,
+    battery: activeBattery(),
     emit: dispatch,
     elapsedSeconds: () => elapsedSeconds(currentCapture(state)?.repStartedAt ?? null, Date.now()),
     history,
@@ -212,7 +216,7 @@ function render(): void {
     // Unrenderable screen (e.g. a stale persisted state from an older build).
     // Recover to a fresh run instead of hard-crashing.
     console.warn(`No renderer for screen "${state.screen.kind}"; resetting.`);
-    state = initialState(genId(), nowIso(), BATTERY, BATTERY_ID);
+    state = initialState(genId(), nowIso(), activeBattery(), BATTERY_ID);
     storage.save(state, history);
     render();
     return;

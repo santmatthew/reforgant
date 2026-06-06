@@ -1,9 +1,25 @@
 import { h, round } from "../dom.ts";
 import { btn, card, eyebrow, pill } from "../ui.ts";
+import { LANGUAGES, type Language } from "../battery.ts";
 import type { ScreenCtx } from "../screen.ts";
 
 export function welcome(ctx: ScreenCtx): HTMLElement {
   const { emit, pendingResume, history } = ctx;
+
+  // Language is local until "Begin" so the select doesn't trigger a re-render.
+  let language: Language = ctx.state.language;
+  const select = h(
+    "select",
+    {
+      class: "lang-select",
+      "aria-label": "Your strongest language",
+      onChange: (e: Event) => {
+        language = (e.target as HTMLSelectElement).value as Language;
+      },
+    },
+    ...LANGUAGES.map((l) => h("option", { value: l.id }, l.name)),
+  ) as HTMLSelectElement;
+  select.value = language; // set after options exist
 
   const intro = card(
     eyebrow("Skills baseline · ~12 minutes"),
@@ -17,9 +33,18 @@ export function welcome(ctx: ScreenCtx): HTMLElement {
         "unassisted skill stands, and how well your going-in confidence matched it.",
     ),
     h(
+      "label",
+      { class: "lang-field" },
+      h("span", { class: "lang-label" }, "Tailor the code reps to"),
+      select,
+    ),
+    h(
       "div",
       { class: "row" },
-      btn("Begin diagnostic", () => emit({ type: "startIntake" })),
+      btn("Begin diagnostic", () => {
+        emit({ type: "setLanguage", language });
+        emit({ type: "startIntake" });
+      }),
       pendingResume
         ? btn("Resume in-progress session", () => emit({ type: "resume", persisted: pendingResume }), {
             variant: "ghost",

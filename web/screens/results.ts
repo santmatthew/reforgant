@@ -143,9 +143,10 @@ function calibration(r: DiagnosticResult): HTMLElement {
 }
 
 function feedbackReview(ctx: ScreenCtx): HTMLElement {
+  // captures pair with the battery by index
   const items = ctx.state.captures
-    .map((cap) => {
-      const rep = ctx.battery.find((b) => b.id === cap.repId);
+    .map((cap, i) => {
+      const rep = ctx.battery[i];
       if (!rep || cap.submission === null) return null;
       return { rep, score: scoreRep(rep, cap.submission) };
     })
