@@ -224,6 +224,9 @@ function render(): void {
   root.replaceChildren(shell(ctx, view(ctx), entering));
   // move keyboard focus to the new screen's heading for a11y
   (root.querySelector("h1") as HTMLElement | null)?.setAttribute("tabindex", "-1");
+  // on a screen change (e.g. "Take it again" → Intake), jump back to the top —
+  // but not on in-screen re-renders, which would yank the scroll position.
+  if (entering) window.scrollTo(0, 0);
   manageTicker();
 }
 
